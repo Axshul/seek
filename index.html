@@ -1,0 +1,326 @@
+<!-- 
+  Enhancements made:
+  - Added SEEK branding (Header).
+  - Replaced "Load More" button with automatic infinite scrolling (IntersectionObserver).
+  - Added dynamic image sizing based on screen width/responsiveness.
+  - Added a "Lightbox" (modal) to view images full screen with an "Export/Download" button.
+  - Added a playful, calm ambient sound that plays upon user interaction (browser policy compliant).
+  - Enhanced UI with a "Glassmorphism" header and smoother transitions.
+-->
+
+<!-- Header with Branding -->
+<header style="
+  position: sticky; 
+  top: 0; 
+  z-index: 100; 
+  background: rgba(9, 9, 9, 0.85); 
+  backdrop-filter: blur(10px); 
+  padding: 15px 20px; 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  border-bottom: 1px solid #333;
+">
+  <div style="font-size: 1.5rem; font-weight: bold; color: #fff; letter-spacing: 2px;">SEEK</div>
+  <a href="https://axshul.site" target="_blank" style="
+    color: #ccc; 
+    text-decoration: none; 
+    font-size: 0.9rem; 
+    border: 1px solid #444; 
+    padding: 8px 16px; 
+    border-radius: 20px; 
+    transition: all 0.3s;
+  " onmouseover="this.style.background='#fff'; this.style.color='#000'" onmouseout="this.style.background='transparent'; this.style.color='#ccc'">
+    axshul.site
+  </a>
+</header>
+
+<!-- Audio Element (Hidden) -->
+<audio id="ambientAudio" loop preload="auto">
+  <!-- Using a calm, royalty-free ambient sound -->
+  <source src="https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=forest-lullaby-110624.mp3" type="audio/mpeg">
+</audio>
+
+<!-- Audio Overlay (Browser requires user interaction to play audio) -->
+<div id="audioOverlay" style="
+  position: fixed; 
+  top: 0; left: 0; width: 100%; height: 100%; 
+  background: #090909; 
+  z-index: 9999; 
+  display: flex; 
+  flex-direction: column; 
+  justify-content: center; 
+  align-items: center; 
+  transition: opacity 0.8s ease;
+">
+  <h1 style="color: #fff; font-weight: 300; margin-bottom: 20px;">Welcome to SEEK Gallery</h1>
+  <button id="startBtn" style="
+    padding: 15px 40px; 
+    font-size: 1.2rem; 
+    background: transparent; 
+    color: #fff; 
+    border: 2px solid #fff; 
+    border-radius: 50px; 
+    cursor: pointer; 
+    transition: all 0.3s;
+  " onmouseover="this.style.background='#fff'; this.style.color='#000'" onmouseout="this.style.background='transparent'; this.style.color='#fff'">
+    Enter Gallery
+  </button>
+  <p style="color: #666; margin-top: 20px; font-size: 0.9rem;">Click to enable sound & experience</p>
+</div>
+
+<!-- Main Gallery Container -->
+<div id="galleryCtn" style="min-height:100vh;"></div>
+
+<!-- Sentinel for Infinite Scroll -->
+<div id="scrollSentinel" style="height: 20px; margin-top: 20px;"></div>
+
+<!-- Loading Indicator -->
+<div id="loadingIndicatorEl" hidden style="text-align:center; padding:20px; color:#666;">Loading...</div>
+
+<!-- Lightbox Modal for Viewing and Exporting -->
+<div id="lightbox" hidden style="
+  position: fixed; 
+  top: 0; left: 0; width: 100%; height: 100%; 
+  background: rgba(0, 0, 0, 0.9); 
+  z-index: 1000; 
+  display: flex; 
+  justify-content: center; 
+  align-items: center; 
+  flex-direction: column;
+  opacity: 0; 
+  transition: opacity 0.3s ease;
+">
+  <button id="closeLightboxBtn" style="
+    position: absolute; 
+    top: 20px; 
+    right: 20px; 
+    background: none; 
+    border: none; 
+    color: #fff; 
+    font-size: 2rem; 
+    cursor: pointer;
+  ">&times;</button>
+  
+  <img id="lightboxImg" src="" style="
+    max-width: 90%; 
+    max-height: 80vh; 
+    border-radius: 4px; 
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+  ">
+  
+  <div style="margin-top: 20px; display: flex; gap: 15px;">
+    <a id="downloadBtn" href="#" download style="
+      padding: 10px 25px; 
+      background: #222; 
+      color: #ddd; 
+      border: 1px solid #444; 
+      border-radius: 4px; 
+      text-decoration: none; 
+      transition: background 0.2s;
+    " onmouseover="this.style.background='#444'" onmouseout="this.style.background='#222'">
+      Export / Download Image
+    </a>
+  </div>
+</div>
+
+<style>
+  body {
+    background-color: #090909; /* Very dark background */
+    color: #ccc;
+    margin: 0;
+    padding: 0; /* Removed padding to let header stick */
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    padding-top: 20px; /* Space for header */
+  }
+
+  /* Masonry Layout using CSS Columns */
+  #galleryCtn {
+    column-count: 5; /* Desktop default */
+    column-gap: 16px;
+    max-width: 1800px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+
+  /* Responsive Breakpoints */
+  @media (max-width: 1400px) { #galleryCtn { column-count: 4; } }
+  @media (max-width: 1000px) { #galleryCtn { column-count: 3; } }
+  @media (max-width: 700px)  { #galleryCtn { column-count: 2; } }
+  @media (max-width: 400px)  { #galleryCtn { column-count: 1; } }
+
+  /* Image Items */
+  .imgItem {
+    break-inside: avoid; /* Prevents image from splitting across columns */
+    margin-bottom: 16px;
+    background-color: #1a1a1a; /* Placeholder bg while loading */
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+    opacity: 0; /* Hidden until loaded */
+    transform: translateY(20px); /* Start slightly lower for entrance effect */
+    transition: opacity 0.6s ease, transform 0.6s ease, box-shadow 0.2s ease;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+  }
+
+  .imgItem.loaded {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .imgItem:hover {
+    z-index: 10;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+    transform: translateY(-4px) scale(1.01);
+  }
+
+  .imgItem img {
+    width: 100%;
+    height: auto;
+    display: block;
+    transition: transform 0.5s ease;
+  }
+
+  /* Subtle zoom on hover */
+  .imgItem:hover img {
+    transform: scale(1.05);
+  }
+
+  /* Lightbox visible state */
+  #lightbox:not([hidden]) {
+    opacity: 1;
+  }
+</style>
+
+<script>
+  const loadingIndicator = loadingIndicatorEl;
+  const audio = document.getElementById('ambientAudio');
+  const lightbox = document.getElementById('lightbox');
+  const lightboxImg = document.getElementById('lightboxImg');
+  const downloadBtn = document.getElementById('downloadBtn');
+  
+  // Handle Start Experience (Audio + Hide Overlay)
+  startBtn.onclick = () => {
+    audio.volume = 0.5; // Set reasonable volume
+    audio.play().catch(e => console.log("Audio play failed (interaction needed):", e));
+    audioOverlay.style.opacity = '0';
+    setTimeout(() => {
+      audioOverlay.style.display = 'none';
+    }, 800);
+  };
+
+  // Close Lightbox
+  closeLightboxBtn.onclick = () => {
+    lightbox.hidden = true;
+    lightbox.style.opacity = '0';
+  };
+  
+  // Close on background click
+  lightbox.onclick = (e) => {
+    if(e.target === lightbox) {
+      lightbox.hidden = true;
+      lightbox.style.opacity = '0';
+    }
+  };
+
+  // Configuration
+  const BATCH_SIZE = 10; // Slightly smaller batch for smoother infinite scroll performance
+  
+  // Helper to get random integer
+  let getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+  // Calculate dimensions based on screen size for better responsive fetching
+  function getResponsiveDimensions() {
+    // Rough approximation of column width
+    let colCount = 5;
+    if(window.innerWidth <= 1400) colCount = 4;
+    if(window.innerWidth <= 1000) colCount = 3;
+    if(window.innerWidth <= 700) colCount = 2;
+    if(window.innerWidth <= 400) colCount = 1;
+    
+    // Target width roughly equal to column width (minus gap)
+    let gap = 16;
+    let padding = 40;
+    let availableWidth = window.innerWidth - padding - (gap * (colCount - 1));
+    let targetWidth = Math.floor(availableWidth / colCount);
+    
+    // Ensure min and max constraints for sanity, but responsive to screen
+    let w = Math.max(300, Math.min(targetWidth, 800)); 
+    
+    // Random aspect ratio height (0.8 to 1.5)
+    let h = Math.floor(w * (Math.random() * 0.7 + 0.8));
+    
+    return { w, h };
+  }
+
+  // Function to create and append images
+  async function addImages() {
+    loadingIndicator.hidden = false; // Show loading indicator
+
+    // Small delay to allow UI to update before heavy rendering
+    await new Promise(r => setTimeout(r, 100));
+
+    for (let i = 0; i < BATCH_SIZE; i++) {
+      let { w, h } = getResponsiveDimensions();
+      
+      // Random seed ensures we get different images
+      let seed = Math.random().toString(36).substring(7);
+      let src = `https://picsum.photos/seed/${seed}/${w}/${h}.jpg`;
+
+      // Create container
+      let item = document.createElement('div');
+      item.className = 'imgItem';
+
+      // Create image
+      let img = document.createElement('img');
+      img.loading = "lazy"; // Native lazy loading for performance
+      img.alt = "Random Gallery Image";
+      img.crossOrigin = "anonymous"; // Required for canvas/download access if needed later
+      
+      // Handle load event for smooth fade-in
+      img.onload = () => {
+        item.classList.add('loaded');
+      };
+      
+      img.src = src;
+      
+      // Add click event for Lightbox
+      item.onclick = () => openLightbox(src);
+
+      item.appendChild(img);
+      galleryCtn.appendChild(item);
+    }
+
+    loadingIndicator.hidden = true;
+  }
+
+  // Lightbox Logic
+  function openLightbox(src) {
+    lightboxImg.src = src;
+    downloadBtn.href = src;
+    lightbox.hidden = false;
+    // Force reflow for transition
+    void lightbox.offsetWidth; 
+    lightbox.style.opacity = '1';
+  }
+
+  // Infinite Scroll Logic using IntersectionObserver
+  const observerOptions = {
+    root: null, // viewport
+    rootMargin: '200px', // start loading 200px before bottom
+    threshold: 0.1
+  };
+
+  const observer = new IntersectionObserver((entries) => {
+    if(entries[0].isIntersecting) {
+      addImages();
+    }
+  }, observerOptions);
+
+  // Initial load
+  addImages().then(() => {
+    // Start observing after first batch loads
+    observer.observe(scrollSentinel);
+  });
+</script>
