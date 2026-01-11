@@ -6,6 +6,9 @@
   - Added a "Lightbox" (modal) to view images full screen with an "Export/Download" button.
   - Added a playful, calm ambient sound that plays upon user interaction (browser policy compliant).
   - Enhanced UI with a "Glassmorphism" header and smoother transitions.
+  - Added ability to toggle between different sound tracks.
+  - Fixed axshul.site button clicking issue.
+  - Added "Made by Axshul 2019" credit line in navigation.
 -->
 
 <!-- Header with Branding -->
@@ -21,24 +24,55 @@
   align-items: center; 
   border-bottom: 1px solid #333;
 ">
-  <div style="font-size: 1.5rem; font-weight: bold; color: #fff; letter-spacing: 2px;">SEEK</div>
-  <a href="https://axshul.site" target="_blank" style="
-    color: #ccc; 
-    text-decoration: none; 
-    font-size: 0.9rem; 
-    border: 1px solid #444; 
-    padding: 8px 16px; 
-    border-radius: 20px; 
-    transition: all 0.3s;
-  " onmouseover="this.style.background='#fff'; this.style.color='#000'" onmouseout="this.style.background='transparent'; this.style.color='#ccc'">
-    axshul.site
-  </a>
+  <div style="display: flex; align-items: center; gap: 15px;">
+    <div style="font-size: 1.5rem; font-weight: bold; color: #fff; letter-spacing: 2px;">SEEK</div>
+    <div style="font-size: 0.75rem; color: #666;">Made by Axshul 2019</div>
+  </div>
+  <div style="display: flex; align-items: center; gap: 15px;">
+    <button id="soundToggleBtn" style="
+      background: transparent;
+      color: #ccc;
+      border: 1px solid #444;
+      padding: 8px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      z-index: 101;
+    " onmouseover="this.style.background='#fff'; this.style.color='#000'" onmouseout="this.style.background='transparent'; this.style.color='#ccc'" title="Click to play/pause, double-click to change track">
+      <span id="soundIcon">🔊</span>
+      <span id="currentTrackName">Track 1</span>
+    </button>
+    <a href="https://axshul.site" target="_blank" id="axshulLink" style="
+      color: #ccc; 
+      text-decoration: none; 
+      font-size: 0.9rem; 
+      border: 1px solid #444; 
+      padding: 8px 16px; 
+      border-radius: 20px; 
+      transition: all 0.3s;
+      z-index: 101;
+      pointer-events: auto;
+    " onmouseover="this.style.background='#fff'; this.style.color='#000'" onmouseout="this.style.background='transparent'; this.style.color='#ccc'">
+      axshul.site
+    </a>
+  </div>
 </header>
 
-<!-- Audio Element (Hidden) -->
-<audio id="ambientAudio" loop preload="auto">
+<!-- Audio Elements (Hidden) -->
+<audio id="ambientAudio1" loop preload="auto">
   <!-- Using a calm, royalty-free ambient sound -->
   <source src="https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=forest-lullaby-110624.mp3" type="audio/mpeg">
+</audio>
+<audio id="ambientAudio2" loop preload="auto">
+  <!-- Using another calm track -->
+  <source src="https://cdn.pixabay.com/download/audio/2022/03/10/audio_c8c8a73467.mp3?filename=relaxing-piano-110855.mp3" type="audio/mpeg">
+</audio>
+<audio id="ambientAudio3" loop preload="auto">
+  <!-- Using another calm track -->
+  <source src="https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3?filename=meditation-impulse-3000.mp3" type="audio/mpeg">
 </audio>
 
 <!-- Audio Overlay (Browser requires user interaction to play audio) -->
@@ -100,6 +134,7 @@
     color: #fff; 
     font-size: 2rem; 
     cursor: pointer;
+    z-index: 1001;
   ">&times;</button>
   
   <img id="lightboxImg" src="" style="
@@ -118,6 +153,7 @@
       border-radius: 4px; 
       text-decoration: none; 
       transition: background 0.2s;
+      z-index: 1001;
     " onmouseover="this.style.background='#444'" onmouseout="this.style.background='#222'">
       Export / Download Image
     </a>
@@ -195,19 +231,80 @@
 
 <script>
   const loadingIndicator = loadingIndicatorEl;
-  const audio = document.getElementById('ambientAudio');
+  const audioTracks = [
+    document.getElementById('ambientAudio1'),
+    document.getElementById('ambientAudio2'),
+    document.getElementById('ambientAudio3')
+  ];
+  let currentTrackIndex = 0;
+  let isPlaying = false;
+  
   const lightbox = document.getElementById('lightbox');
   const lightboxImg = document.getElementById('lightboxImg');
   const downloadBtn = document.getElementById('downloadBtn');
+  const soundToggleBtn = document.getElementById('soundToggleBtn');
+  const soundIcon = document.getElementById('soundIcon');
+  const currentTrackName = document.getElementById('currentTrackName');
+  
+  // Sound track names
+  const trackNames = ['Forest Lullaby', 'Relaxing Piano', 'Meditation Impulse'];
+  
+  // Initialize audio elements
+  audioTracks.forEach((audio, index) => {
+    audio.volume = 0.5;
+    audio.addEventListener('ended', () => {
+      // Auto-play next track when current ends
+      if (isPlaying) {
+        toggleTrack();
+      }
+    });
+  });
   
   // Handle Start Experience (Audio + Hide Overlay)
   startBtn.onclick = () => {
-    audio.volume = 0.5; // Set reasonable volume
-    audio.play().catch(e => console.log("Audio play failed (interaction needed):", e));
+    audioTracks[currentTrackIndex].play().catch(e => console.log("Audio play failed (interaction needed):", e));
+    isPlaying = true;
     audioOverlay.style.opacity = '0';
     setTimeout(() => {
       audioOverlay.style.display = 'none';
     }, 800);
+  };
+
+  // Toggle between sound tracks (play/pause on single click)
+  soundToggleBtn.onclick = () => {
+    if (isPlaying) {
+      // Pause current track
+      audioTracks[currentTrackIndex].pause();
+      isPlaying = false;
+      soundIcon.textContent = '🔇';
+    } else {
+      // Play current track
+      audioTracks[currentTrackIndex].play().catch(e => console.log("Audio play failed:", e));
+      isPlaying = true;
+      soundIcon.textContent = '🔊';
+    }
+  };
+  
+  // Function to switch to next track
+  function toggleTrack() {
+    // Stop current track
+    audioTracks[currentTrackIndex].pause();
+    audioTracks[currentTrackIndex].currentTime = 0;
+    
+    // Move to next track
+    currentTrackIndex = (currentTrackIndex + 1) % audioTracks.length;
+    currentTrackName.textContent = trackNames[currentTrackIndex];
+    
+    // Play new track if we were playing before
+    if (isPlaying) {
+      audioTracks[currentTrackIndex].play().catch(e => console.log("Audio play failed:", e));
+    }
+  }
+  
+  // Add double-click to change track
+  soundToggleBtn.ondblclick = (e) => {
+    e.stopPropagation(); // Prevent triggering the click event
+    toggleTrack();
   };
 
   // Close Lightbox
